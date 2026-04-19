@@ -32,6 +32,8 @@ Three experiments were conducted with increasing values of λ (sparsity regulari
 | **1e-4** (Medium) | 63.53 | 88.98 | Heavy pruning with minimal accuracy cost |
 | **5e-4** (High) | 63.09 | 97.54 | Extreme pruning, only 0.82% accuracy drop |
 
+![Sparsity vs Accuracy Trade-off](sparsity_vs_accuracy.png)
+
 ### Per-Layer Sparsity Breakdown
 
 | Layer | Shape | λ=1e-5 | λ=1e-4 | λ=5e-4 |
@@ -63,7 +65,11 @@ The gate distribution plots (saved as `gate_distributions_all.png` and `gate_dis
 
 - **A cluster of values away from 0:** These are the surviving, "important" connections. Despite the L1 pressure to close, these gates remain open because their contribution to classification accuracy outweighs the sparsity penalty.
 
+![Gate Value Distributions](gate_distributions_all.png)
+
 This **bimodal distribution** is the hallmark of successful self-pruning — it demonstrates that the network has learned a clear, binary distinction between useful and useless connections.
+
+![Best Model Detail](gate_distribution.png)
 
 ### Training Dynamics
 
