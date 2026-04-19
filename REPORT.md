@@ -87,4 +87,4 @@ The self-pruning mechanism works remarkably well:
 - The warmup + linear ramp schedule enables stable training even under aggressive pruning
 - The per-layer sparsity pattern (heaviest in early layers, lightest in output) aligns with theoretical expectations about information flow in neural networks
 
-The most impressive result is achieving **97.5% sparsity with less than 1% accuracy loss**, demonstrating that this feed-forward network is massively over-parameterized for CIFAR-10 and that self-pruning can effectively discover the minimal necessary architecture.
+The most impressive result is achieving **97.5% sparsity with less than 1% accuracy loss**, demonstrating that this feed-forward network is massively over-parameterized and that self-pruning can effectively discover the minimal necessary architecture.

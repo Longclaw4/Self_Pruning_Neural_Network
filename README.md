@@ -1,104 +1,70 @@
-# 🧠 The Self-Pruning Neural Network
+# 🧠 The Self-Pruning Neural Network — CIFAR-10
 
-**Case Study — Tredence Analytics AI Engineering Internship**
-
-A neural network that **learns to prune itself during training** by using learnable per-weight gates and L1 sparsity regularization. Built on CIFAR-10 with PyTorch.
+A research-oriented implementation of a neural network that identifies and removes its own redundant connections during training, achieving massive compression (**97.5%**) with negligible accuracy loss.
 
 ---
 
-## 📌 Overview
+## 📘 1. Mathematical Intuition
 
-Traditional pruning removes unimportant weights **after** training. This project implements a network that prunes itself **during** training by:
+Exact sparsity in this model is achieved through an **L1-Sigmoid gating mechanism**, which is effective for three primary reasons:
 
-1. **Gated Weights** — Each weight has a learnable gate (sigmoid of a score). Gates near 0 effectively remove the weight.
-2. **L1 Regularization** — A sparsity penalty on gate values drives unimportant gates to zero.
-3. **λ Trade-off** — A hyperparameter controls pruning aggressiveness vs. accuracy.
+1. **Constant Gradient Pressure**: Unlike L2 regularization (weight decay), the **L1 norm** ($\|g\|_1 = \sum |g_i|$) maintains a constant gradient pressure. This ensures that parameters are pushed all the way to **precisely zero** rather than just becoming very small.
+2. **Sigmoid Saturation**: The sigmoid function $\sigma(s)$ acts as a learnable "soft switch." By penalizing the *output* of the sigmoid, the optimizer is forced to drive the *input score* $s$ toward $-\infty$. This creates a clean bimodal separation where weights are either fully active or fully pruned.
+3. **Dynamic Architecture Search**: The network effectively "searches" for its minimal necessary sub-architecture during the training process, preventing the need for manual post-hoc pruning or heuristic weight removal.
 
-## 🏗️ Architecture
+## 🏗️ 2. Core Architecture
 
-```
-Input (3×32×32 = 3072) → Flatten
-  → PrunableLinear(3072, 1024) → BatchNorm → ReLU
-  → PrunableLinear(1024, 512)  → BatchNorm → ReLU
-  → PrunableLinear(512, 256)   → BatchNorm → ReLU
-  → PrunableLinear(256, 10)    → Output (logits)
-```
+The system is built around a self-contained modular pipeline:
 
-### Loss Function
+*   **PrunableLinear Module**: A custom `nn.Module` that maintains standard `weight` parameters alongside learnable `gate_scores`. It calculates the effective weights as: $W_{eff} = W \times \sigma(gate\_scores)$.
+*   **Network Flow**: A 4-layer MLP (3072 → 1024 → 512 → 256 → 10) utilizing BatchNorm and ReLU activations at each hidden stage to maintain stable gradient flow.
+*   **Dual-Objective Loss**:
+    $$Total\_Loss = CrossEntropy + \lambda \times \sum (\sigma(gate\_scores))$$
+    where $\lambda$ (Lambda) serves as the primary control for sparsity aggressiveness.
 
-```
-Total Loss = CrossEntropyLoss + λ × Σ sigmoid(gate_scores)
-```
+## 📊 3. Performance Results
 
-### Training Strategy
+The model was evaluated across multiple sparsity regimes to identify the optimal Pareto frontier between model size and classification power.
 
-- **Warmup**: First 10 epochs with λ=0 (pure classification — network learns which weights matter)
-- **Pruning Phase**: λ ramps linearly from 0 to target over remaining 30 epochs
-- **Separate LR**: Gate parameters use 10× higher learning rate for effective pruning dynamics
+| Sparsity Pressure ($\lambda$) | Test Accuracy | Sparsity Level | Interpretation |
+|:----------:|:------------:|:--------------:|:---|
+| Low (1e-5) | 63.91% | 51.15% | Feature Discovery Phase |
+| Medium (1e-4) | 63.53% | 88.98% | **Optimal Efficiency** |
+| High (5e-4) | 63.09% | **97.54%** | Extreme Compression |
 
-## 📊 Results
+### Bimodal Gate Distribution
+The success of the self-pruning mechanism is confirmed by the bimodal distribution of gate values, showing a distinct separation between pruned weights and critical surviving connections.
 
-| Lambda (λ) | Test Accuracy | Sparsity Level |
-|:----------:|:------------:|:--------------:|
-| 1e-5 (Low) | **63.91%** | 51.15% |
-| 1e-4 (Medium) | **63.53%** | 88.98% |
-| 5e-4 (High) | **63.09%** | **97.54%** |
+![Gate Distribution](gate_distribution.png)
 
-> **Key Finding:** Only 0.82% accuracy drop while removing 97.5% of all weights!
+## 🛠️ 4. System Highlights
+- **Layer-wise Adaptivity**: Pruning is most aggressive in earlier, wide layers (e.g., fc1), while the output layer remains dense to preserve decision boundaries.
+- **$\lambda$-Warmup Strategy**: The network utilizes a warmup phase (10 epochs of λ=0) to ensure high-quality feature extraction before sparsity pressure is introduced.
+- **Optimization Strategy**: Separate learning rates are used for weights ($1e^{-3}$) and gates ($1e^{-2}$) to ensure pruning dynamics converge at the correct scale.
 
-See the full analysis in [REPORT.md](REPORT.md).
+---
 
-## 🚀 Quick Start
+## 🚀 Execution Guide
 
-### Option 1: Google Colab (Recommended)
-
-1. Open `Self_Pruning_Neural_Network.ipynb` in Google Colab
-2. Set runtime to **T4 GPU** (Runtime → Change runtime type → T4)
-3. Run all cells (~48 min total for 3 experiments)
-
-### Option 2: Local Execution
+1. **Standalone Script**: Run `python main.py` for a complete training, evaluation, and logging cycle.
+2. **Interactive Notebook**: Open `Self_Pruning_Neural_Network.ipynb` for detailed visualizations, training curves, and layer-wise breakdown.
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/tredence-self-pruning-network.git
-cd tredence-self-pruning-network
-
-# Install dependencies
+# Setup
+git clone https://github.com/Longclaw4/Self_Pruning_Neural_Network.git
 pip install -r requirements.txt
 
-# Run the notebook
-jupyter notebook Self_Pruning_Neural_Network.ipynb
+# Run
+python main.py
 ```
 
-## 📋 Requirements
-
-- Python 3.8+
-- PyTorch 2.0+
-- torchvision
-- matplotlib
-- numpy
-- CUDA-compatible GPU (recommended)
-
-See [requirements.txt](requirements.txt) for exact versions.
-
-## 📁 Repository Structure
+## 📁 Project Structure
 
 ```
-├── Self_Pruning_Neural_Network.ipynb   # Main Colab notebook (single script)
-├── REPORT.md                           # Analysis report with plots
-├── README.md                           # This file
-├── requirements.txt                    # Python dependencies
-└── .gitignore                          # Git ignore rules
+├── main.py                             # Self-contained training script
+├── Self_Pruning_Neural_Network.ipynb   # Interactive experimental suite
+├── REPORT.md                           # Detailed technical analysis
+├── README.md                           # Project overview
+├── requirements.txt                    # Dependencies
+└── results/                            # Metrics and visualizations
 ```
-
-## 🔑 Key Concepts
-
-- **PrunableLinear Layer**: Custom `nn.Module` with `weight`, `bias`, and `gate_scores` parameters
-- **Gate Mechanism**: `gates = sigmoid(gate_scores)` → `pruned_weights = weight × gates`
-- **Sparsity Loss**: L1 norm (sum) of all gate values across all layers
-- **λ Warmup**: Train normally first, then gradually increase pruning pressure
-- **Bimodal Distribution**: Successful pruning shows gates clustered at 0 (pruned) and away from 0 (surviving)
-
-## 📄 License
-
-This project is submitted as part of the Tredence Analytics AI Engineering Internship case study.
