@@ -47,7 +47,8 @@ class PrunableLinear(nn.Module):
         gates = torch.sigmoid(self.gate_scores)
         # Multiply weight by gates (element-wise) before linear operation
         pruned_weight = self.weight * gates
-        return nn.functional.linear(x, pruned_weight, self.bias)
+        # Perform the linear operation from scratch: y = xW^T + b
+        return x @ pruned_weight.t() + self.bias
 
     def get_gate_values(self):
         return torch.sigmoid(self.gate_scores).detach()
